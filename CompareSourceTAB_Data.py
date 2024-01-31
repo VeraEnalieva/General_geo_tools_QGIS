@@ -6,10 +6,10 @@ import processing
 from qgis.core import *
 
 # USER_SETTING_1   Old data
-prev_data_path = r'D:\wrk_TORIS\Source_geo_data\test\Oct'
+prev_data_path = r'D:\wrk_TORIS\Source_geo_data\ИАЦ_2023_12_27\all_twn'
 
 # USER_SETTING_2   New data
-new_data_path = r'D:\wrk_TORIS\Source_geo_data\test\Nov '
+new_data_path = r'D:\wrk_TORIS\Source_geo_data\ИАЦ_2024_01_31\all_twn'
 
 convert_2_gdb = True
 crs = 'USER:100022'
@@ -38,6 +38,15 @@ def print_log(mes):
     print(mes)
     log.write(mes)
 
+
+def print_log2(mes, file):
+    log_file = file
+    log = open(log_file, 'a')
+    print(mes)
+    log.write(mes)
+    log.close()
+    
+    
 def compare_tabs(field_names_old, field_names_new, basename):
     if field_names_old != field_names_new:
         mes = f'\n!!!!!!!!!!WARNING!!!!!!!!!\nНабор атрибутов слоя {basename} отличается!'
@@ -111,6 +120,10 @@ def compare_data(fc, old_fc, type_geom):
     else:
         mes = f'\nВ слое {basename} удалено {feats_count} объектов'
         print_log(mes)
+    #del fc_count, feats_count
+    if os.path.isfile(basename+'_added.gpkg') and os.path.isfile(basename+'_deleted.gpkg'):
+        update_analizer_log(basename, basename+'_added.gpkg', basename+'_deleted.gpkg')
+    
     
 def convert2gdb(fc, crs, type_geom, basename):
     res1 = processing.run("native:assignprojection", 
@@ -135,6 +148,79 @@ def convert2gdb(fc, crs, type_geom, basename):
     return True
 
     
+
+def update_analizer_log(basename, added_features, deleted_features):
+    res1 = processing.run("native:joinattributesbylocation", 
+                {
+                #'INPUT':added_features,
+                'INPUT':QgsProcessingFeatureSourceDefinition(added_features, 
+                                selectedFeaturesOnly=False, 
+                                featureLimit=-1, 
+                                flags=QgsProcessingFeatureSourceDefinition.FlagOverrideDefaultGeometryCheck, 
+                                geometryCheck=QgsFeatureRequest.GeometrySkipInvalid
+                                ),
+                'PREDICATE':[0],
+                'JOIN':deleted_features,
+                'JOIN':QgsProcessingFeatureSourceDefinition(deleted_features, 
+                                selectedFeaturesOnly=False, 
+                                featureLimit=-1, 
+                                flags=QgsProcessingFeatureSourceDefinition.FlagOverrideDefaultGeometryCheck, 
+                                geometryCheck=QgsFeatureRequest.GeometrySkipInvalid
+                                ),
+                'JOIN_FIELDS':[],
+                'METHOD':0,
+                'DISCARD_NONMATCHING':True,
+                'PREFIX':'DEL_',
+                'OUTPUT':basename+'_update.gpkg',
+                'NON_MATCHING':basename+'_added2.gpkg'
+                })
+    update_fc = QgsVectorLayer(basename+'_update.gpkg')
+    
+    f_lst = [field.name() for field in update_fc.fields()]  # Список полей слоя
+    
+    f_count = int(len(f_lst)/2)  # Количество полей в слое
+
+    features = update_fc.getFeatures() # Объекты
+    for feat in features:
+        attrs = feat.attributes()
+        first_idx = 0
+        for feat_attribe in range(f_count):
+            val1 = attrs[first_idx]
+            idx = first_idx+f_count
+            val2 = attrs[idx]
+            
+            if val1 != val2 and first_idx != 0:  # Не сравниваем поле fid
+                log_name = basename+'_upd.log'
+                mes = (f'\nИзменилcя атрибут "{str(f_lst[first_idx])}" объекта {str(attrs[0])}')
+                print_log2(mes, log_name)
+                mes = ('\nБыло:\t'+str(val2))
+                print_log2(mes, log_name)
+                mes = ('\nСтало:\t'+str(val1))
+                print_log2(mes, log_name)
+            first_idx += 1
+
+    
+    res2 = processing.run("native:joinattributesbylocation", 
+                {
+                'INPUT':QgsProcessingFeatureSourceDefinition(deleted_features, selectedFeaturesOnly=False, featureLimit=-1, flags=QgsProcessingFeatureSourceDefinition.FlagOverrideDefaultGeometryCheck, geometryCheck=QgsFeatureRequest.GeometrySkipInvalid),
+                'PREDICATE':[0],
+                'JOIN':added_features,
+                'JOIN_FIELDS':[],
+                'METHOD':0,
+                'DISCARD_NONMATCHING':True,
+                'PREFIX':'DEL_',
+                'OUTPUT':'TEMPORARY_OUTPUT',
+                'NON_MATCHING':basename+'_deleted2.gpkg'
+                })
+    del res2, res1, added_features,  update_fc, deleted_features,
+    #os.remove(basename+'_added.gpkg')
+    #os.remove(basename+'_deleted.gpkg')
+    #deleted_features.close()
+    #os.remove(deleted_features)
+    #os.rename(basename+'_deleted2.gpkg', basename+'_deleted.gpkg')
+    #os.rename(basename+'_added2.gpkg', basename+'_added.gpkg')
+    
+            
 os.chdir(prev_data_path)
 old_tab_files={key: os.path.abspath(key) for key in glob.glob('*.tab')}
 
@@ -218,8 +304,7 @@ for fc in new_tab_files:
                     convert2gdb(new_data, crs, type_geom, basename)
                 
                 compare_data(new_data, old_data, type_geom_dict[type_geom])
-
-            
+                
         for layer in QgsProject.instance().mapLayers().values():
             QgsProject.instance().removeMapLayers( [layer.id()] )    
 
