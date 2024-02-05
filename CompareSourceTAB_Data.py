@@ -42,7 +42,7 @@ def print_log(mes):
 def print_log2(mes, file):
     log_file = file
     log = open(log_file, 'a')
-    print(mes)
+    #print(mes)
     log.write(mes)
     log.close()
     
