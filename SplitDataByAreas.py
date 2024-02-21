@@ -58,7 +58,7 @@ processing.run("native:splitvectorlayer",
     {
     'INPUT':QgsProcessingFeatureSourceDefinition(areas_path, selectedFeaturesOnly=False, featureLimit=-1, flags=QgsProcessingFeatureSourceDefinition.FlagOverrideDefaultGeometryCheck, geometryCheck=QgsFeatureRequest.GeometrySkipInvalid),
     'FIELD': areas_names_field,
-    'PREFIX_FIELD':False,
+    'PREFIX_FIELD':True,
     'FILE_TYPE':0,
     'OUTPUT':result_path
     })
