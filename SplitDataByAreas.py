@@ -40,6 +40,7 @@ def crop_by_mask(mask, fc):
     #return os.path.abspath(res['OUTPUT'])
     return res['OUTPUT']
 
+
 def merge_news(file_lst):
     new_region_file = (os.path.basename(one_part)).split('.')[0]+'_data.'+ext
     merged_file = processing.run("native:mergevectorlayers", 
